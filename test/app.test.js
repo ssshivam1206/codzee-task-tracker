@@ -28,3 +28,53 @@ test('unknown routes return JSON 404', async () => {
   assert.equal(response.status, 404);
   assert.deepEqual(await response.json(), { error: 'Not found' });
 });
+
+test('creates, reads, updates and deletes a task', async () => {
+  const createdResponse = await fetch(`${baseUrl}/tasks`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ title: '  Plan review  ' }),
+  });
+  assert.equal(createdResponse.status, 201);
+  const created = await createdResponse.json();
+  assert.equal(created.title, 'Plan review');
+  assert.equal(created.completed, false);
+  assert.equal(createdResponse.headers.get('location'), `/tasks/${created.id}`);
+
+  const listed = await (await fetch(`${baseUrl}/tasks`)).json();
+  assert.equal(listed.tasks.length, 1);
+  assert.equal(listed.tasks[0].id, created.id);
+
+  const updatedResponse = await fetch(`${baseUrl}/tasks/${created.id}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ completed: true }),
+  });
+  assert.equal(updatedResponse.status, 200);
+  assert.equal((await updatedResponse.json()).completed, true);
+
+  const fetched = await (await fetch(`${baseUrl}/tasks/${created.id}`)).json();
+  assert.equal(fetched.completed, true);
+
+  const deleted = await fetch(`${baseUrl}/tasks/${created.id}`, { method: 'DELETE' });
+  assert.equal(deleted.status, 204);
+  assert.equal((await fetch(`${baseUrl}/tasks/${created.id}`)).status, 404);
+});
+
+test('rejects malformed task input', async () => {
+  for (const body of ['{}', '{"title":"  "}', '{"title":4}', '{"title":"ok","extra":true}', '{']) {
+    const response = await fetch(`${baseUrl}/tasks`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body,
+    });
+    assert.equal(response.status, 400, body);
+  }
+
+  const wrongType = await fetch(`${baseUrl}/tasks`, {
+    method: 'POST',
+    headers: { 'content-type': 'text/plain' },
+    body: 'hello',
+  });
+  assert.equal(wrongType.status, 415);
+});

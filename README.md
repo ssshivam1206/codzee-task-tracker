@@ -1,6 +1,6 @@
 # Task Tracker API
 
-A small, dependency-free Node.js API used to explore GitHub pull request reviews. It starts with a health endpoint; task features are added through focused pull requests.
+A small, dependency-free Node.js API used to explore GitHub pull request reviews.
 
 ## Requirements
 
@@ -20,8 +20,15 @@ The server listens on port 3000 by default. Set `PORT` to choose another port.
 npm test
 ```
 
-## Current endpoint
+## Endpoints
 
 - `GET /health` returns `{ "status": "ok" }`.
+- `GET /tasks` lists tasks.
+- `POST /tasks` creates a task from `{ "title": "Plan review" }`.
+- `GET /tasks/:id` gets one task.
+- `PATCH /tasks/:id` updates `title` and/or `completed`.
+- `DELETE /tasks/:id` removes a task.
+
+Task write requests must send `Content-Type: application/json`. Data is kept in memory and resets when the server restarts.
 
 This project uses only Node.js built-in modules.
