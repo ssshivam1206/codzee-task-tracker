@@ -22,11 +22,11 @@ async function readJson(request) {
   const chunks = [];
   for await (const chunk of request) {
     bytes += chunk.length;
-    if (bytes > MAX_BODY_BYTES) {
-      throw httpError(413, 'Request body is too large');
-    }
-    chunks.push(chunk);
+    if (bytes <= MAX_BODY_BYTES) chunks.push(chunk);
   }
+  // Drain an oversized request before responding; leaving the async iterator
+  // early destroys the request stream and can reset the client's connection.
+  if (bytes > MAX_BODY_BYTES) throw httpError(413, 'Request body is too large');
 
   try {
     return JSON.parse(Buffer.concat(chunks).toString('utf8'));
@@ -48,10 +48,11 @@ function validateTaskInput(value, partial = false) {
 
   const result = {};
   if (!partial || Object.hasOwn(value, 'title')) {
-    if (typeof value.title !== 'string' || value.title.trim().length === 0 || value.title.trim().length > 120) {
+    const title = typeof value.title === 'string' ? value.title.trim() : null;
+    if (title === null || [...title].length === 0 || [...title].length > 120) {
       throw httpError(400, 'Title must contain 1 to 120 characters');
     }
-    result.title = value.title.trim();
+    result.title = title;
   }
   if (Object.hasOwn(value, 'completed')) {
     if (typeof value.completed !== 'boolean') {
@@ -72,6 +73,11 @@ export function createApp({ store = createTaskStore() } = {}) {
         sendJson(response, 200, { status: 'ok' });
         return;
       }
+      if (pathname === '/health') {
+        response.setHeader('allow', 'GET');
+        sendJson(response, 405, { error: 'Method not allowed' });
+        return;
+      }
 
       if (pathname === '/tasks') {
         if (request.method === 'GET') {
@@ -85,6 +91,9 @@ export function createApp({ store = createTaskStore() } = {}) {
           sendJson(response, 201, task);
           return;
         }
+        response.setHeader('allow', 'GET, POST');
+        sendJson(response, 405, { error: 'Method not allowed' });
+        return;
       }
 
       const taskMatch = /^\/tasks\/([^/]+)$/.exec(pathname);
@@ -109,6 +118,9 @@ export function createApp({ store = createTaskStore() } = {}) {
           response.end();
           return;
         }
+        response.setHeader('allow', 'GET, PATCH, DELETE');
+        sendJson(response, 405, { error: 'Method not allowed' });
+        return;
       }
 
       sendJson(response, 404, { error: 'Not found' });
@@ -117,6 +129,7 @@ export function createApp({ store = createTaskStore() } = {}) {
         response.destroy(error);
         return;
       }
+      if (!error.status) console.error(error);
       const status = error.status ?? 500;
       sendJson(response, status, { error: status === 500 ? 'Internal server error' : error.message });
     }
