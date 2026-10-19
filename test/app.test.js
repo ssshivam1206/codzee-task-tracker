@@ -126,6 +126,9 @@ test('validates PATCH changes and missing task IDs', async () => {
 });
 
 test('returns 405 and an Allow header for unsupported methods', async () => {
+  const healthResponse = await fetch(`${baseUrl}/health`, { method: 'POST' });
+  assert.equal(healthResponse.status, 405);
+  assert.equal(healthResponse.headers.get('allow'), 'GET');
   const response = await fetch(`${baseUrl}/tasks`, { method: 'DELETE' });
   assert.equal(response.status, 405);
   assert.equal(response.headers.get('allow'), 'GET, POST');
