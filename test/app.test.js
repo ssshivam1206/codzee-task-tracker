@@ -147,3 +147,44 @@ test('accepts 120 emoji code points in a title', async () => {
   const task = await response.json();
   await fetch(`${baseUrl}/tasks/${task.id}`, { method: 'DELETE' });
 });
+
+test('filters, searches, sorts and paginates tasks', async () => {
+  const create = async (title) => {
+    const response = await fetch(`${baseUrl}/tasks`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title }),
+    });
+    return response.json();
+  };
+  const first = await create('Review login');
+  const second = await create('Write tests');
+  const third = await create('Review API');
+
+  await fetch(`${baseUrl}/tasks/${second.id}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ completed: true }),
+  });
+
+  const filtered = await (await fetch(`${baseUrl}/tasks?completed=false&q=review`)).json();
+  assert.equal(filtered.total, 2);
+  assert.deepEqual(filtered.tasks.map((task) => task.id), [first.id, third.id]);
+
+  const page = await (await fetch(`${baseUrl}/tasks?sort=newest&limit=1&offset=1`)).json();
+  assert.equal(page.total, 3);
+  assert.equal(page.limit, 1);
+  assert.equal(page.offset, 1);
+  assert.deepEqual(page.tasks.map((task) => task.id), [second.id]);
+
+  for (const id of [first.id, second.id, third.id]) {
+    await fetch(`${baseUrl}/tasks/${id}`, { method: 'DELETE' });
+  }
+});
+
+test('rejects ambiguous and invalid list queries', async () => {
+  for (const query of ['completed=yes', 'sort=random', 'limit=0', 'offset=-1', 'q=%20', 'limit=1&limit=2', 'unknown=x']) {
+    const response = await fetch(`${baseUrl}/tasks?${query}`);
+    assert.equal(response.status, 400, query);
+  }
+});
