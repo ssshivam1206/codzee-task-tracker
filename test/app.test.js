@@ -147,3 +147,78 @@ test('accepts 120 emoji code points in a title', async () => {
   const task = await response.json();
   await fetch(`${baseUrl}/tasks/${task.id}`, { method: 'DELETE' });
 });
+
+test('filters, searches, sorts and paginates tasks', async () => {
+  const create = async (title) => {
+    const response = await fetch(`${baseUrl}/tasks`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title }),
+    });
+    return response.json();
+  };
+  const first = await create('Review login');
+  const second = await create('Write tests');
+  const third = await create('Review API');
+
+  await fetch(`${baseUrl}/tasks/${second.id}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ completed: true }),
+  });
+
+  const filtered = await (await fetch(`${baseUrl}/tasks?completed=false&q=review`)).json();
+  assert.equal(filtered.total, 2);
+  assert.deepEqual(filtered.tasks.map((task) => task.id), [first.id, third.id]);
+
+  const page = await (await fetch(`${baseUrl}/tasks?sort=newest&limit=1&offset=1`)).json();
+  assert.equal(page.total, 3);
+  assert.equal(page.limit, 1);
+  assert.equal(page.offset, 1);
+  assert.deepEqual(page.tasks.map((task) => task.id), [second.id]);
+
+  const filteredPage = await (await fetch(`${baseUrl}/tasks?completed=false&q=review&sort=oldest&limit=1&offset=1`)).json();
+  assert.equal(filteredPage.total, 2);
+  assert.deepEqual(filteredPage.tasks.map((task) => task.id), [third.id]);
+
+  const pastEnd = await (await fetch(`${baseUrl}/tasks?offset=99`)).json();
+  assert.equal(pastEnd.total, 3);
+  assert.deepEqual(pastEnd.tasks, []);
+
+  for (const id of [first.id, second.id, third.id]) {
+    await fetch(`${baseUrl}/tasks/${id}`, { method: 'DELETE' });
+  }
+});
+
+test('rejects ambiguous and invalid list queries', async () => {
+  for (const query of ['completed=yes', 'sort=random', 'limit=0', 'limit=101', 'limit=abc', 'offset=-1', 'q=%20', `q=${'x'.repeat(121)}`, 'limit=1&limit=2', 'unknown=x']) {
+    const response = await fetch(`${baseUrl}/tasks?${query}`);
+    assert.equal(response.status, 400, query);
+  }
+});
+
+test('unpaged list preserves all tasks and a full-length emoji query works', async () => {
+  const ids = [];
+  const title = '😀'.repeat(120);
+  for (let index = 0; index < 21; index += 1) {
+    const response = await fetch(`${baseUrl}/tasks`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title: index === 0 ? title : `Task ${index}` }),
+    });
+    ids.push((await response.json()).id);
+  }
+
+  const unpaged = await (await fetch(`${baseUrl}/tasks`)).json();
+  assert.equal(unpaged.total, 21);
+  assert.equal(unpaged.limit, null);
+  assert.equal(unpaged.tasks.length, 21);
+
+  const maxPage = await (await fetch(`${baseUrl}/tasks?limit=100`)).json();
+  assert.equal(maxPage.tasks.length, 21);
+  const searched = await (await fetch(`${baseUrl}/tasks?q=${encodeURIComponent(title)}`)).json();
+  assert.equal(searched.total, 1);
+  assert.equal(searched.tasks[0].id, ids[0]);
+
+  for (const id of ids) await fetch(`${baseUrl}/tasks/${id}`, { method: 'DELETE' });
+});

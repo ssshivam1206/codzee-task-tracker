@@ -64,10 +64,53 @@ function validateTaskInput(value, partial = false) {
   return result;
 }
 
+function readTaskQuery(searchParams) {
+  const allowed = new Set(['completed', 'q', 'limit', 'offset', 'sort']);
+  for (const key of searchParams.keys()) {
+    if (!allowed.has(key) || searchParams.getAll(key).length > 1) {
+      throw httpError(400, `Unsupported or repeated query parameter: ${key}`);
+    }
+  }
+
+  const completed = searchParams.get('completed');
+  if (completed !== null && completed !== 'true' && completed !== 'false') {
+    throw httpError(400, 'Completed filter must be true or false');
+  }
+
+  const q = searchParams.get('q');
+  if (q !== null && ([...q.trim()].length === 0 || [...q.trim()].length > 120)) {
+    throw httpError(400, 'Search term must contain 1 to 120 characters');
+  }
+
+  const parseInteger = (name, fallback, minimum, maximum) => {
+    const raw = searchParams.get(name);
+    if (raw === null) return fallback;
+    if (!/^\d+$/.test(raw)) throw httpError(400, `${name} must be an integer`);
+    const value = Number(raw);
+    if (!Number.isSafeInteger(value) || value < minimum || value > maximum) {
+      throw httpError(400, `${name} must be between ${minimum} and ${maximum}`);
+    }
+    return value;
+  };
+
+  const sort = searchParams.get('sort') ?? 'oldest';
+  if (sort !== 'oldest' && sort !== 'newest') {
+    throw httpError(400, 'Sort must be oldest or newest');
+  }
+
+  return {
+    completed: completed === null ? null : completed === 'true',
+    q: q?.trim().toLowerCase() ?? null,
+    limit: parseInteger('limit', null, 1, 100),
+    offset: parseInteger('offset', 0, 0, Number.MAX_SAFE_INTEGER),
+    sort,
+  };
+}
+
 export function createApp({ store = createTaskStore() } = {}) {
   return createServer(async (request, response) => {
     try {
-      const { pathname } = new URL(request.url, 'http://localhost');
+      const { pathname, searchParams } = new URL(request.url, 'http://localhost');
 
       if (request.method === 'GET' && pathname === '/health') {
         sendJson(response, 200, { status: 'ok' });
@@ -81,7 +124,22 @@ export function createApp({ store = createTaskStore() } = {}) {
 
       if (pathname === '/tasks') {
         if (request.method === 'GET') {
-          sendJson(response, 200, { tasks: store.list() });
+          const query = readTaskQuery(searchParams);
+          let tasks = store.list();
+          if (query.completed !== null) {
+            tasks = tasks.filter((task) => task.completed === query.completed);
+          }
+          if (query.q !== null) {
+            tasks = tasks.filter((task) => task.title.toLowerCase().includes(query.q));
+          }
+          if (query.sort === 'newest') tasks.reverse();
+          const total = tasks.length;
+          sendJson(response, 200, {
+            tasks: tasks.slice(query.offset, query.limit === null ? undefined : query.offset + query.limit),
+            total,
+            limit: query.limit,
+            offset: query.offset,
+          });
           return;
         }
         if (request.method === 'POST') {
