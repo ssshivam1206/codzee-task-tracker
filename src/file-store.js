@@ -30,7 +30,8 @@ export async function createFileTaskStore(filePath) {
     if (error.code === 'ENOENT') initialTasks = [];
     else throw error;
   }
-  if (!Array.isArray(initialTasks) || !initialTasks.every(isTask)) {
+  if (!Array.isArray(initialTasks) || !initialTasks.every(isTask)
+    || new Set(initialTasks.map((task) => task.id)).size !== initialTasks.length) {
     throw new Error(`Invalid task data in ${filePath}`);
   }
 
