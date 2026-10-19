@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
-export function createTaskStore() {
-  const tasks = new Map();
+export function createTaskStore(initialTasks = []) {
+  const tasks = new Map(initialTasks.map((task) => [task.id, task]));
 
   return {
     list() {

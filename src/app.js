@@ -125,7 +125,7 @@ export function createApp({ store = createTaskStore() } = {}) {
       if (pathname === '/tasks') {
         if (request.method === 'GET') {
           const query = readTaskQuery(searchParams);
-          let tasks = store.list();
+          let tasks = await store.list();
           if (query.completed !== null) {
             tasks = tasks.filter((task) => task.completed === query.completed);
           }
@@ -144,7 +144,7 @@ export function createApp({ store = createTaskStore() } = {}) {
         }
         if (request.method === 'POST') {
           const input = validateTaskInput(await readJson(request));
-          const task = store.create(input.title);
+          const task = await store.create(input.title);
           response.setHeader('location', `/tasks/${task.id}`);
           sendJson(response, 201, task);
           return;
@@ -158,20 +158,20 @@ export function createApp({ store = createTaskStore() } = {}) {
       if (taskMatch) {
         const id = taskMatch[1];
         if (request.method === 'GET') {
-          const task = store.get(id);
+          const task = await store.get(id);
           if (!task) throw httpError(404, 'Task not found');
           sendJson(response, 200, task);
           return;
         }
         if (request.method === 'PATCH') {
           const changes = validateTaskInput(await readJson(request), true);
-          const task = store.update(id, changes);
+          const task = await store.update(id, changes);
           if (!task) throw httpError(404, 'Task not found');
           sendJson(response, 200, task);
           return;
         }
         if (request.method === 'DELETE') {
-          if (!store.remove(id)) throw httpError(404, 'Task not found');
+          if (!await store.remove(id)) throw httpError(404, 'Task not found');
           response.writeHead(204);
           response.end();
           return;

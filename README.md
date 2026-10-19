@@ -29,7 +29,7 @@ npm test
 - `PATCH /tasks/:id` updates `title` and/or `completed`.
 - `DELETE /tasks/:id` removes a task.
 
-Task write requests must send `Content-Type: application/json`. Data is kept in memory and resets when the server restarts.
+Task write requests must send `Content-Type: application/json`. By default, data is kept in memory and resets when the server restarts. Set `TASKS_FILE=./data/tasks.json` to persist changes to a JSON file. The file is created after the first write; malformed existing data prevents startup rather than silently erasing tasks.
 
 `GET /tasks` returns `{ "tasks": [...], "total": 0, "limit": null, "offset": 0 }`. Omitting `limit` keeps the original behavior of returning every matching task; set `limit` for larger lists. Filtering happens before sorting and pagination. The default order is creation order (oldest first).
 
