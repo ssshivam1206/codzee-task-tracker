@@ -78,7 +78,7 @@ function readTaskQuery(searchParams) {
   }
 
   const q = searchParams.get('q');
-  if (q !== null && (q.trim().length === 0 || q.trim().length > 120)) {
+  if (q !== null && ([...q.trim()].length === 0 || [...q.trim()].length > 120)) {
     throw httpError(400, 'Search term must contain 1 to 120 characters');
   }
 
@@ -101,7 +101,7 @@ function readTaskQuery(searchParams) {
   return {
     completed: completed === null ? null : completed === 'true',
     q: q?.trim().toLowerCase() ?? null,
-    limit: parseInteger('limit', 20, 1, 100),
+    limit: parseInteger('limit', null, 1, 100),
     offset: parseInteger('offset', 0, 0, Number.MAX_SAFE_INTEGER),
     sort,
   };
@@ -135,7 +135,7 @@ export function createApp({ store = createTaskStore() } = {}) {
           if (query.sort === 'newest') tasks.reverse();
           const total = tasks.length;
           sendJson(response, 200, {
-            tasks: tasks.slice(query.offset, query.offset + query.limit),
+            tasks: tasks.slice(query.offset, query.limit === null ? undefined : query.offset + query.limit),
             total,
             limit: query.limit,
             offset: query.offset,

@@ -31,6 +31,6 @@ npm test
 
 Task write requests must send `Content-Type: application/json`. Data is kept in memory and resets when the server restarts.
 
-`GET /tasks` returns `{ "tasks": [...], "total": 0, "limit": 20, "offset": 0 }`. Filtering happens before sorting and pagination. The default order is creation order (oldest first).
+`GET /tasks` returns `{ "tasks": [...], "total": 0, "limit": null, "offset": 0 }`. Omitting `limit` keeps the original behavior of returning every matching task; set `limit` for larger lists. Filtering happens before sorting and pagination. The default order is creation order (oldest first).
 
 This project uses only Node.js built-in modules.
