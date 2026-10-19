@@ -1,0 +1,14 @@
+{
+  "name": "codzee-task-tracker",
+  "version": "0.1.0",
+  "private": false,
+  "type": "module",
+  "description": "A small dependency-free task API for exercising pull request review workflows",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test"
+  }
+}
